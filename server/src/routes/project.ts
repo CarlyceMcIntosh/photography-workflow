@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
-import { CreateProjectSchema } from '../schemas/project.js';
+import { CreateProjectSchema, UpdateProjectSchema } from '../schemas/project.js';
+
 import { supabase } from '../lib/supabase.js';
 
 const router = Router();
@@ -11,7 +12,7 @@ router.use(requireAuth);
 // GET /projects - List all projects for authenticated user
 router.get('/', async (req: AuthRequest, res) => {
   try {
-    const userId = req.user!.id;  // Safe: requireAuth guarantees user exists
+    const userId = req.user!.id;  // requireAuth guarantees user exists
 
     // Query projects where user is the creator
     const { data: projects, error } = await supabase
@@ -40,7 +41,7 @@ router.post('/', async (req: AuthRequest, res) => {
     if (!validation.success) {
       return res.status(400).json({ 
         error: 'Validation failed', 
-        details: validation.error.errors 
+        details: validation.error.issues 
       });
     }
 
@@ -73,5 +74,79 @@ router.post('/', async (req: AuthRequest, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// GET /projects/:id - Get single project by ID
+router.get('/:id', async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.id;
+  
+      // Query project by ID AND created_by_user_id
+      const { data: project, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', id)
+        .eq('created_by_user_id', userId)
+        .single();
+  
+      if (error || !project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+  
+      res.json({ project });
+    } catch (error) {
+      console.error('Error in GET /projects/:id:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+// PATCH /projects/:id - Update project
+router.patch('/:id', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+
+    // Validate request body
+    const validation = UpdateProjectSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: validation.error.issues
+      });
+    }
+
+    // First verify that the project exists and the user owns it
+    const { data: existing, error: fetchError } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', id)
+      .eq('created_by_user_id', userId)
+      .single();
+
+    if (fetchError || !existing) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    // Update the project
+    const { data: project, error: updateError } = await supabase
+      .from('projects')
+      .update(validation.data)
+      .eq('id', id)
+      .eq('created_by_user_id', userId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Database error updating project:', updateError);
+      return res.status(500).json({ error: 'Failed to update project' });
+    }
+
+    res.json({ project });
+  } catch (error) {
+    console.error('Error in PATCH /projects/:id:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+  
 
 export default router;
