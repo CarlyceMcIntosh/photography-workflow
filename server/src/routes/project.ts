@@ -147,6 +147,44 @@ router.patch('/:id', async (req: AuthRequest, res) => {
   }
 });
 
+// DELETE /projects/:id - Delete project
+router.delete('/:id', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+
+    // First verify the project exists and user owns it
+    const { data: existing, error: fetchError } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', id)
+      .eq('created_by_user_id', userId)
+      .single();
+
+    if (fetchError || !existing) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    // Delete the project
+    const { error: deleteError } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', id)
+      .eq('created_by_user_id', userId);
+
+    if (deleteError) {
+      console.error('Database error deleting project:', deleteError);
+      return res.status(500).json({ error: 'Failed to delete project' });
+    }
+
+    res.json({ message: 'Project deleted successfully' });
+  } catch (error) {
+    console.error('Error in DELETE /projects/:id:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
   
 
 export default router;
