@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../lib/AuthContext'
 import { fetchFromAPI } from '../lib/api'
@@ -65,9 +66,10 @@ export function ProjectList() {
     <div className="space-y-4">
       {/* Loop through the projects and create one card for each project */}
       {projects.map((project) => (
-        <div
+        <Link
           // React uses the unique project id to track each item in the list
           key={project.id}
+          to={`/projects/${project.id}`}
           className="bg-white p-6 rounded-lg shadow border border-gray-200"
         >
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -98,7 +100,7 @@ export function ProjectList() {
               </p>
             )}
           </div>
-        </div>
+        </Link>
       ))}
     </div>
   )
